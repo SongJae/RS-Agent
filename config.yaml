@@ -6,21 +6,25 @@
 llm:
   # backend 옵션:
   #   "anthropic"         - Anthropic Claude API (외부망 필요)
-  #   "openai_compatible" - OpenAI 호환 로컬 서버 (vLLM, LM Studio, Ollama /v1 등)
+  #   "openai_compatible" - OpenAI 호환 로컬 서버 (vLLM, LM Studio, Ollama /v1, 내장 서버 등)
   #   "ollama"            - Ollama 네이티브 API
   backend: "openai_compatible"
 
-  # 사용할 모델 이름 (백엔드에 따라 다름)
-  # Anthropic  예: "claude-opus-4-6"
-  # Ollama     예: "llama3.1:70b", "qwen2.5:72b", "mistral:7b"
-  # vLLM       예: "Qwen/Qwen2.5-72B-Instruct"
-  model: "llama3.1:70b"
+  # 사용할 모델 이름 (서버 종류에 따라 다름)
+  # Anthropic    예: "claude-opus-4-6"
+  # Ollama       예: "llama3.1:70b", "qwen2.5:72b"
+  # vLLM         예: "Qwen/Qwen2.5-7B-Instruct"
+  # 내장 서버    예: "mock-rs-agent" (mock), "/models/Qwen2.5-7B-Instruct" (transformers)
+  model: "mock-rs-agent"
 
   max_tokens: 4096
 
   # openai_compatible / ollama 백엔드 설정
-  base_url: "http://localhost:11434/v1"  # Ollama OpenAI 호환 엔드포인트
-  api_key: "ollama"                       # 로컬 서버는 임의 값 사용
+  # 내장 서버: python scripts/start_local_server.py --backend mock --port 11434
+  # Ollama:    ollama serve
+  # vLLM:      python -m vllm.entrypoints.openai.api_server --model /models/...
+  base_url: "http://localhost:11434/v1"
+  api_key: "local"
 
   # Anthropic 전용 설정 (backend: "anthropic" 일 때만 사용됨)
   thinking:
