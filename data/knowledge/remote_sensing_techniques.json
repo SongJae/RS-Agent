@@ -1,0 +1,66 @@
+[
+  {
+    "doc_id": "tech_001",
+    "title": "SAR (Synthetic Aperture Radar) Remote Sensing",
+    "content": "Synthetic Aperture Radar (SAR) is an active microwave remote sensing system that can penetrate clouds and operate day/night. Key properties: wavelength bands (X-band: 3cm, C-band: 5.6cm, L-band: 23cm), polarization (HH, VV, HV, VH), imaging geometry (range, azimuth). SAR backscatter depends on surface roughness, dielectric properties, and incidence angle. Water appears dark (specular reflection), ships appear as bright points. SAR is invaluable for disaster monitoring, maritime surveillance, and deforestation tracking. Common SAR satellites: Sentinel-1, RADARSAT-2, TerraSAR-X, COSMO-SkyMed.",
+    "category": "techniques",
+    "keywords": ["SAR", "synthetic aperture radar", "microwave", "C-band", "X-band", "L-band", "backscatter", "sentinel-1"],
+    "metadata": {"source": "Remote Sensing Techniques Encyclopedia", "year": 2023}
+  },
+  {
+    "doc_id": "tech_002",
+    "title": "Optical Remote Sensing and Multispectral Imaging",
+    "content": "Optical remote sensing captures reflected solar radiation in visible, near-infrared (NIR), and shortwave infrared (SWIR) bands. Key concepts: spatial resolution (sub-meter to >30m), spectral resolution (multispectral vs hyperspectral), temporal resolution. NDVI (Normalized Difference Vegetation Index) = (NIR-Red)/(NIR+Red), widely used for vegetation analysis. False color composites (NIR-R-G) highlight vegetation as red. Landsat series provides 30m resolution with 16-day repeat cycle. Sentinel-2 provides 10m resolution with 5-day revisit. High-resolution satellites (Pleiades, WorldView) offer <0.5m imagery.",
+    "category": "techniques",
+    "keywords": ["optical", "multispectral", "NDVI", "infrared", "NIR", "SWIR", "Landsat", "Sentinel-2", "WorldView"],
+    "metadata": {"source": "Remote Sensing Techniques Encyclopedia", "year": 2023}
+  },
+  {
+    "doc_id": "tech_003",
+    "title": "Object Detection in Remote Sensing",
+    "content": "Object detection in remote sensing involves locating and classifying objects within aerial/satellite imagery. Challenges include: small object size relative to scene, various object orientations, complex backgrounds, scale variation. Common approaches: 1) Horizontal bounding box detection (HBB) for axis-aligned objects, 2) Oriented/Rotated bounding box detection (OBB/RBB) for arbitrarily oriented objects. Key datasets: DOTA (detection in optical remote sensing images), HRSC2016 (ships), FAIR1M (fine-grained recognition). State-of-the-art methods use attention mechanisms and feature pyramid networks.",
+    "category": "techniques",
+    "keywords": ["object detection", "bounding box", "oriented detection", "DOTA", "remote sensing"],
+    "metadata": {"source": "Remote Sensing AI Methods", "year": 2023}
+  },
+  {
+    "doc_id": "tech_004",
+    "title": "Change Detection Methods in Remote Sensing",
+    "content": "Change detection identifies differences between images acquired at different times over the same area. Methods include: 1) Image differencing - subtract temporal images to find changed pixels, 2) Ratio methods - divide temporal images to normalize illumination differences, 3) Deep learning - CNN-based binary change detection. Applications: urban expansion monitoring, deforestation tracking, disaster assessment, agricultural monitoring. Key challenges: co-registration errors, illumination differences, seasonal phenological changes. Common metrics: Overall Accuracy (OA), F1-score, IoU (Intersection over Union). Datasets: LEVIR-CD, WHU-CD, CDD.",
+    "category": "techniques",
+    "keywords": ["change detection", "temporal", "binary", "urban expansion", "deforestation", "LEVIR-CD"],
+    "metadata": {"source": "Remote Sensing AI Methods", "year": 2023}
+  },
+  {
+    "doc_id": "tech_005",
+    "title": "Image Super-Resolution for Remote Sensing",
+    "content": "Super-resolution (SR) enhances the spatial resolution of remote sensing images. Methods: 1) Single Image SR (SISR) using deep learning (SRCNN, EDSR, RCAN), 2) Fusing high-resolution panchromatic with low-resolution multispectral (pansharpening). Scale factors: 2x, 4x, 8x. Metrics: PSNR, SSIM, LPIPS. Challenges: preserving spectral fidelity, avoiding hallucination artifacts. Remote sensing SR datasets: UC-Merced, AID, NWPU. Perceptual quality vs reconstruction fidelity tradeoff is critical for scientific applications.",
+    "category": "techniques",
+    "keywords": ["super resolution", "SISR", "pansharpening", "SRCNN", "spatial resolution", "upsampling"],
+    "metadata": {"source": "Remote Sensing Image Processing", "year": 2023}
+  },
+  {
+    "doc_id": "tech_006",
+    "title": "Semantic Segmentation for Land Cover Mapping",
+    "content": "Semantic segmentation assigns a class label to every pixel in remote sensing imagery. Classes typically include: building, road, vegetation, water, farmland, bare land. Key architectures: FCN, U-Net, DeepLab, SegFormer. Remote sensing challenges: large image size, class imbalance, annotation cost. Common datasets: ISPRS Potsdam/Vaihingen, LoveDA, iSAID. Evaluation metrics: mean IoU (mIoU), pixel accuracy, F1 per class. Transfer learning from ImageNet significantly improves performance on remote sensing segmentation.",
+    "category": "techniques",
+    "keywords": ["semantic segmentation", "land cover", "U-Net", "FCN", "mIoU", "ISPRS", "pixel classification"],
+    "metadata": {"source": "Remote Sensing AI Methods", "year": 2023}
+  },
+  {
+    "doc_id": "tech_007",
+    "title": "Remote Sensing Image Scene Classification",
+    "content": "Scene classification categorizes entire remote sensing image patches into scene types. Common categories: airport, beach, forest, residential, commercial, industrial, farmland, etc. Datasets: UC-Merced (21 classes), AID (30 classes), NWPU-RESISC45 (45 classes), PatternNet (38 classes). Methods: CNN-based (ResNet, EfficientNet), ViT, multi-scale feature extraction. Accuracy on NWPU-RESISC45 exceeds 95% with modern methods. Scene classification helps high-level understanding of remote sensing imagery.",
+    "category": "techniques",
+    "keywords": ["scene classification", "UC-Merced", "NWPU", "AID", "CNN", "ResNet", "scene recognition"],
+    "metadata": {"source": "Remote Sensing AI Methods", "year": 2023}
+  },
+  {
+    "doc_id": "tech_008",
+    "title": "Cloud and Haze Removal in Optical Remote Sensing",
+    "content": "Cloud and haze contamination is a major challenge for optical remote sensing. Approaches: 1) Single image methods - deep learning to inpaint cloud-covered regions, 2) Multi-temporal compositing - select cloud-free pixels from multiple acquisitions, 3) Optical-SAR fusion - use SAR data (cloud-penetrating) to guide optical cloud removal. Haze removal uses dark channel prior or deep learning (DCPDN, AOD-Net). Cloud detection datasets: SPARCS, DPCL, Landsat-8 Cloud Cover Assessment. Cloud removal metrics: PSNR, SSIM, spectral accuracy.",
+    "category": "techniques",
+    "keywords": ["cloud removal", "haze", "dark channel", "multi-temporal", "SAR fusion", "inpainting"],
+    "metadata": {"source": "Remote Sensing Image Processing", "year": 2023}
+  }
+]

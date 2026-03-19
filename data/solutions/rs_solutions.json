@@ -1,0 +1,201 @@
+[
+  {
+    "task_type": "cloud_removal",
+    "task_description": "Remove clouds from optical remote sensing images to obtain clear imagery",
+    "tools_used": ["cloud_removal"],
+    "solution_steps": [
+      "Identify the presence and density of clouds in the input image",
+      "Apply cloud_removal tool to generate a cloud-free image",
+      "Verify the quality of the cloud-removed result",
+      "Report the processing results to the user"
+    ],
+    "tips": "Cloud removal works best on images with less than 80% cloud coverage. For heavily clouded images, consider multi-temporal compositing."
+  },
+  {
+    "task_type": "image_enhancement",
+    "task_description": "Enhance image quality by removing haze, noise, or improving resolution",
+    "tools_used": ["image_dehazing", "image_denoising", "super_resolution"],
+    "solution_steps": [
+      "Assess the image quality issues (haze, noise, low resolution)",
+      "Apply image_dehazing if haze is present",
+      "Apply image_denoising if noise is detected",
+      "Apply super_resolution to enhance spatial detail if needed",
+      "Compare before and after images to verify improvement"
+    ],
+    "tips": "For best results, apply denoising before super-resolution. Dehazing should be applied first if haze obscures image details."
+  },
+  {
+    "task_type": "object_detection",
+    "task_description": "Detect and locate specific objects (vehicles, ships, aircraft) in remote sensing images",
+    "tools_used": ["horizontal_object_detection", "rotated_object_detection"],
+    "solution_steps": [
+      "Determine the type of objects to detect from user requirements",
+      "Choose horizontal or rotated detection based on object orientation needs",
+      "Apply the detection tool with appropriate confidence threshold",
+      "Count and summarize detected objects",
+      "Report detection results with bounding box coordinates"
+    ],
+    "tips": "Use rotated_object_detection for objects with arbitrary orientations (aircraft, ships in harbors). Use horizontal_object_detection for upright objects."
+  },
+  {
+    "task_type": "sar_analysis",
+    "task_description": "Analyze SAR (Synthetic Aperture Radar) images for object detection or classification",
+    "tools_used": ["sar_object_detection", "aircraft_classification_sar"],
+    "solution_steps": [
+      "Confirm the input image is a SAR image",
+      "Apply sar_object_detection to find targets",
+      "For aircraft targets, apply aircraft_classification_sar to identify aircraft types",
+      "Interpret SAR-specific signatures in results",
+      "Report findings with SAR-specific context"
+    ],
+    "tips": "SAR images have different visual characteristics than optical images. Bright spots indicate high radar backscatter. Ships appear as bright point targets on dark water."
+  },
+  {
+    "task_type": "scene_classification",
+    "task_description": "Classify the overall scene type of a remote sensing image",
+    "tools_used": ["scene_classification"],
+    "solution_steps": [
+      "Load the remote sensing image",
+      "Apply scene_classification tool",
+      "Analyze top-k prediction results",
+      "Report the predicted scene category and confidence"
+    ],
+    "tips": "Scene classification is sensitive to image resolution and scale. Provide the full scene image rather than cropped regions for best accuracy."
+  },
+  {
+    "task_type": "semantic_segmentation",
+    "task_description": "Perform pixel-level land cover classification of remote sensing images",
+    "tools_used": ["semantic_segmentation"],
+    "solution_steps": [
+      "Apply semantic_segmentation to the input image",
+      "Analyze the class distribution in the segmentation map",
+      "Calculate area statistics for each land cover class",
+      "Report the dominant land cover types and their spatial distribution"
+    ],
+    "tips": "Semantic segmentation provides per-pixel classification. Use it when you need detailed spatial distribution of land cover types."
+  },
+  {
+    "task_type": "building_extraction",
+    "task_description": "Extract and map building footprints from remote sensing imagery",
+    "tools_used": ["building_extraction"],
+    "solution_steps": [
+      "Apply building_extraction to the urban/suburban image",
+      "Analyze building footprint results",
+      "Calculate building coverage ratio and count",
+      "Report building extraction statistics"
+    ],
+    "tips": "Building extraction works best with high-resolution imagery (< 1m GSD). Low-resolution imagery may miss small buildings."
+  },
+  {
+    "task_type": "road_extraction",
+    "task_description": "Extract road networks from remote sensing images",
+    "tools_used": ["road_extraction"],
+    "solution_steps": [
+      "Apply road_extraction to the input image",
+      "Calculate total road length and density",
+      "Identify major road types (highways, urban roads, rural roads)",
+      "Report road network statistics"
+    ],
+    "tips": "Road extraction benefits from high-resolution imagery. Look for linear features with consistent width and color."
+  },
+  {
+    "task_type": "aircraft_classification",
+    "task_description": "Identify and classify aircraft types in remote sensing images",
+    "tools_used": ["horizontal_object_detection", "aircraft_classification_optical"],
+    "solution_steps": [
+      "Apply horizontal_object_detection or rotated_object_detection to find aircraft",
+      "For each detected aircraft, apply aircraft_classification_optical (or SAR variant)",
+      "Report aircraft types, counts, and spatial distribution",
+      "Cross-reference with knowledge base for aircraft specifications"
+    ],
+    "tips": "Aircraft classification accuracy depends on image resolution. High-resolution imagery (< 0.5m) provides better classification results."
+  },
+  {
+    "task_type": "damage_assessment",
+    "task_description": "Assess damage in disaster-affected areas using pre and post-event images",
+    "tools_used": ["damage_assessment", "change_detection"],
+    "solution_steps": [
+      "Obtain both pre-event and post-event remote sensing images",
+      "Apply change_detection to identify changed areas",
+      "Apply damage_assessment for detailed damage severity classification",
+      "Calculate damage statistics (area, severity distribution)",
+      "Report findings to support emergency response"
+    ],
+    "tips": "For rapid damage assessment, prioritize areas near known disaster epicenter. Consider SAR imagery for cloud-covered disaster areas."
+  },
+  {
+    "task_type": "object_counting",
+    "task_description": "Count specific objects (vehicles, aircraft, ships) in remote sensing images",
+    "tools_used": ["object_counting", "horizontal_object_detection"],
+    "solution_steps": [
+      "Identify the target object category from user requirements",
+      "Apply object_counting tool for efficient counting",
+      "Optionally verify with horizontal_object_detection for spatial distribution",
+      "Report total count and density statistics"
+    ],
+    "tips": "Object counting is optimized for dense scenes. For sparse objects, use detection tools instead. Consider image tiling for large area analysis."
+  },
+  {
+    "task_type": "change_detection",
+    "task_description": "Detect land cover and land use changes between two temporal images",
+    "tools_used": ["change_detection"],
+    "solution_steps": [
+      "Ensure both images are co-registered (same geographic extent)",
+      "Apply change_detection with the two temporal images",
+      "Analyze change types and their spatial distribution",
+      "Calculate changed area and change rate",
+      "Report temporal changes with statistics"
+    ],
+    "tips": "Use images from similar seasons to reduce phenological change artifacts. Cloud-free imagery is essential for accurate change detection."
+  },
+  {
+    "task_type": "land_use_classification",
+    "task_description": "Map land use and land cover types across a region",
+    "tools_used": ["land_use_classification", "semantic_segmentation"],
+    "solution_steps": [
+      "Apply land_use_classification for overall LULC mapping",
+      "Use semantic_segmentation for detailed pixel-level classification",
+      "Calculate area statistics for each land use category",
+      "Analyze spatial patterns and distribution",
+      "Report land use composition and spatial distribution"
+    ],
+    "tips": "LULC classification accuracy varies by season. Multi-temporal analysis improves agricultural and vegetation classification."
+  },
+  {
+    "task_type": "visual_question_answering",
+    "task_description": "Answer specific questions about remote sensing imagery content",
+    "tools_used": ["remote_sensing_vqa"],
+    "solution_steps": [
+      "Parse the user's question about the remote sensing image",
+      "Apply remote_sensing_vqa with the image and question",
+      "Optionally supplement with relevant tool analysis",
+      "Provide a comprehensive answer combining VQA and tool results"
+    ],
+    "tips": "VQA works best for factual questions about image content. For quantitative analysis, combine VQA with specialized tools."
+  },
+  {
+    "task_type": "knowledge_query",
+    "task_description": "Answer domain-specific questions about remote sensing, aircraft, sensors, or techniques",
+    "tools_used": ["knowledge_query"],
+    "solution_steps": [
+      "Identify the domain knowledge needed",
+      "Apply knowledge_query to retrieve relevant information",
+      "Synthesize retrieved knowledge into a comprehensive answer",
+      "Cite sources from the knowledge database"
+    ],
+    "tips": "The knowledge base covers aircraft specifications, satellite sensors, and remote sensing techniques. Use specific technical terms for better retrieval."
+  },
+  {
+    "task_type": "comprehensive_analysis",
+    "task_description": "Perform comprehensive analysis of a remote sensing scene including detection, classification, and statistics",
+    "tools_used": ["scene_classification", "horizontal_object_detection", "semantic_segmentation", "object_counting"],
+    "solution_steps": [
+      "First, classify the overall scene type with scene_classification",
+      "Perform object detection for relevant targets",
+      "Apply semantic_segmentation for land cover analysis",
+      "Count specific objects of interest",
+      "Synthesize all results into a comprehensive report"
+    ],
+    "tips": "For comprehensive analysis, start with scene-level understanding before drilling into specific objects or features."
+  }
+]
