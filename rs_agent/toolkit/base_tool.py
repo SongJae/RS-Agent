@@ -34,5 +34,16 @@ class BaseTool(ABC):
             "input_schema": self.input_schema,
         }
 
+    def to_openai_tool(self) -> dict:
+        """Convert to OpenAI-compatible tool format (for local LLM backends)."""
+        return {
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": self.input_schema,
+            },
+        }
+
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(name={self.name!r})"

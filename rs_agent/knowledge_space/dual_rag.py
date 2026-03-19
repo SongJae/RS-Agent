@@ -156,6 +156,7 @@ class DualRAG:
         self,
         knowledge_db,
         embedding_model: str = "all-MiniLM-L6-v2",
+        local_model_path: str = "",
         top_k_semantic: int = 5,
         top_k_keyword: int = 5,
         semantic_weight: float = 0.6,
@@ -172,7 +173,9 @@ class DualRAG:
         self.semantic_model = None
         self.doc_embeddings: Optional[np.ndarray] = None
 
-        self._build_index(embedding_model)
+        # 폐쇄망: local_model_path가 지정되면 해당 경로에서 로드, 아니면 HuggingFace 다운로드
+        model_to_load = local_model_path.strip() if local_model_path else embedding_model
+        self._build_index(model_to_load)
 
     def _build_index(self, model_name: str):
         """Build both semantic and keyword indices."""

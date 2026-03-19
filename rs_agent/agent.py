@@ -11,14 +11,17 @@ Implements the LLM-based Central Controller that:
 Architecture follows the paper:
     "RS-Agent: Automating Remote Sensing Tasks through Intelligent Agents"
     arXiv: 2406.07089
+
+LLM Backend 지원:
+    - "anthropic"         : Anthropic Claude API (외부망 필요)
+    - "openai_compatible" : OpenAI 호환 로컬 서버 (vLLM, LM Studio, Ollama /v1 등)
+    - "ollama"            : Ollama 네이티브 API
 """
 
 import os
 import json
 import logging
 from typing import List, Dict, Any, Optional, Generator
-
-import anthropic
 
 from rs_agent.toolkit.rs_tools import get_all_tools, TOOL_REGISTRY
 from rs_agent.solution_space import SolutionDatabase, TaskAwareRetrieval
@@ -55,7 +58,7 @@ class RSAgent:
     RS-Agent: LLM-driven Remote Sensing Intelligent Agent.
 
     Integrates four key components:
-    1. Central Controller (Claude claude-opus-4-6 with adaptive thinking)
+    1. Central Controller (LLM — Anthropic 또는 로컬 LLM)
     2. Dynamic Toolkit (19 remote sensing tools)
     3. Solution Space (Task-Aware Retrieval)
     4. Knowledge Space (DualRAG)
@@ -69,15 +72,75 @@ class RSAgent:
         self._setup_toolkit()
         self.conversation_history: List[Dict] = []
 
+    # ──────────────────────────────────────────────
+    # Client Setup
+    # ──────────────────────────────────────────────
+
     def _setup_client(self):
-        """Initialize the Anthropic client."""
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        """
+        LLM 백엔드를 초기화합니다.
+
+        config.yaml의 llm.backend 값에 따라 분기:
+          - "anthropic"         → Anthropic Python SDK
+          - "openai_compatible" → OpenAI Python SDK (base_url 변경)
+          - "ollama"            → OpenAI Python SDK (Ollama /v1 엔드포인트)
+        """
+        llm_cfg = self.config.get("llm", {})
+        self.backend = llm_cfg.get("backend", "anthropic")
+        self.model = llm_cfg.get("model", "claude-opus-4-6")
+        self.max_tokens = llm_cfg.get("max_tokens", 4096)
+
+        if self.backend == "anthropic":
+            self._setup_anthropic(llm_cfg)
+        elif self.backend in ("openai_compatible", "ollama"):
+            self._setup_openai_compatible(llm_cfg)
+        else:
+            raise ValueError(
+                f"Unknown LLM backend: '{self.backend}'. "
+                "Choose from: anthropic, openai_compatible, ollama"
+            )
+
+        logger.info(
+            f"Central Controller initialized: backend={self.backend}, model={self.model}"
+        )
+
+    def _setup_anthropic(self, llm_cfg: Dict):
+        """Anthropic Claude API 클라이언트 초기화."""
+        try:
+            import anthropic
+        except ImportError:
+            raise ImportError("anthropic 패키지가 필요합니다: pip install anthropic")
+
+        api_key = os.environ.get("ANTHROPIC_API_KEY") or llm_cfg.get("api_key", "")
         if not api_key:
-            raise ValueError("ANTHROPIC_API_KEY environment variable not set.")
+            raise ValueError(
+                "ANTHROPIC_API_KEY 환경변수 또는 config의 llm.api_key가 필요합니다."
+            )
         self.client = anthropic.Anthropic(api_key=api_key)
-        self.model = self.config.get("llm", {}).get("model", "claude-opus-4-6")
-        self.max_tokens = self.config.get("llm", {}).get("max_tokens", 4096)
-        logger.info(f"Central Controller initialized: {self.model}")
+        self.thinking_config = llm_cfg.get("thinking", {"type": "adaptive"})
+
+    def _setup_openai_compatible(self, llm_cfg: Dict):
+        """OpenAI 호환 로컬 LLM 클라이언트 초기화 (vLLM / Ollama / LM Studio)."""
+        try:
+            from openai import OpenAI
+        except ImportError:
+            raise ImportError("openai 패키지가 필요합니다: pip install openai")
+
+        # 환경변수 우선, 없으면 config, 없으면 기본값
+        base_url = (
+            os.environ.get("LLM_BASE_URL")
+            or llm_cfg.get("base_url", "http://localhost:11434/v1")
+        )
+        api_key = (
+            os.environ.get("LLM_API_KEY")
+            or llm_cfg.get("api_key", "ollama")
+        )
+        self.client = OpenAI(base_url=base_url, api_key=api_key)
+        logger.info(f"OpenAI-compatible client → {base_url}")
+
+    # ──────────────────────────────────────────────
+    # Knowledge / Solution / Toolkit Setup
+    # ──────────────────────────────────────────────
 
     def _setup_knowledge_space(self):
         """Initialize the Knowledge Space with DualRAG."""
@@ -87,6 +150,7 @@ class RSAgent:
         self.dual_rag = DualRAG(
             knowledge_db=self.knowledge_db,
             embedding_model=ks_config.get("embedding_model", "all-MiniLM-L6-v2"),
+            local_model_path=ks_config.get("local_model_path", ""),
             top_k_semantic=ks_config.get("top_k_semantic", 5),
             top_k_keyword=ks_config.get("top_k_keyword", 5),
             semantic_weight=ks_config.get("semantic_weight", 0.6),
@@ -102,6 +166,7 @@ class RSAgent:
         self.task_retrieval = TaskAwareRetrieval(
             solution_db=self.solution_db,
             embedding_model=ss_config.get("embedding_model", "all-MiniLM-L6-v2"),
+            local_model_path=ss_config.get("local_model_path", ""),
             top_k=ss_config.get("top_k", 3),
             similarity_threshold=ss_config.get("similarity_threshold", 0.3),
         )
@@ -111,31 +176,36 @@ class RSAgent:
         """Initialize the Dynamic Toolkit with all 19 RS tools."""
         self.tools = get_all_tools(knowledge_space=self.dual_rag)
         self.tool_map = {tool.name: tool for tool in self.tools}
-        self.anthropic_tools = [tool.to_anthropic_tool() for tool in self.tools]
+        # 백엔드에 따라 다른 tool 포맷 사전 생성
+        if self.backend == "anthropic":
+            self._tools_formatted = [tool.to_anthropic_tool() for tool in self.tools]
+        else:
+            self._tools_formatted = [tool.to_openai_tool() for tool in self.tools]
         logger.info(f"Dynamic Toolkit initialized: {len(self.tools)} tools")
 
+    # ──────────────────────────────────────────────
+    # System Prompt
+    # ──────────────────────────────────────────────
+
     def _build_system_prompt(self, query: str) -> str:
-        """
-        Build the system prompt enriched with Task-Aware Retrieval context.
-
-        This is the core of the Solution Space integration:
-        expert solutions are retrieved and injected into the system context.
-        """
+        """Build system prompt enriched with Task-Aware Retrieval context."""
         base_prompt = self.config.get("agent", {}).get("system_prompt", SYSTEM_PROMPT)
-
-        # Task-Aware Retrieval: get relevant expert solutions
         relevant_solutions = self.task_retrieval.retrieve(query)
         solution_context = self.task_retrieval.format_as_context(relevant_solutions)
-
         if solution_context:
             return f"{base_prompt}\n\n{solution_context}"
         return base_prompt
 
-    def _execute_tool(self, tool_name: str, tool_input: Dict) -> str:
-        """Execute a tool and return the result as a string."""
-        if tool_name not in self.tool_map:
-            return f"Error: Tool '{tool_name}' not found in toolkit."
+    # ──────────────────────────────────────────────
+    # Tool Execution
+    # ──────────────────────────────────────────────
 
+    def _execute_tool(self, tool_name: str, tool_input: Dict) -> str:
+        """Execute a tool and return the result as a JSON string."""
+        if tool_name not in self.tool_map:
+            return json.dumps(
+                {"status": "error", "message": f"Tool '{tool_name}' not found."}
+            )
         tool = self.tool_map[tool_name]
         try:
             result = tool.run(**tool_input)
@@ -146,14 +216,117 @@ class RSAgent:
                     "data": result.output,
                 }
             else:
-                output = {
-                    "status": "error",
-                    "message": result.message,
-                }
+                output = {"status": "error", "message": result.message}
             return json.dumps(output, indent=2, default=str)
         except Exception as e:
             logger.error(f"Tool '{tool_name}' execution error: {e}")
             return json.dumps({"status": "error", "message": str(e)})
+
+    # ──────────────────────────────────────────────
+    # Chat — Anthropic backend
+    # ──────────────────────────────────────────────
+
+    def _chat_anthropic(self, messages: List[Dict], system_prompt: str) -> str:
+        """Agentic loop for Anthropic Claude backend."""
+        max_iterations = self.config.get("agent", {}).get("max_iterations", 10)
+
+        for _ in range(max_iterations):
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=self.max_tokens,
+                thinking=self.thinking_config,
+                system=system_prompt,
+                tools=self._tools_formatted,
+                messages=messages,
+            )
+
+            if response.stop_reason == "end_turn":
+                return "".join(
+                    block.text for block in response.content if block.type == "text"
+                )
+
+            if response.stop_reason == "tool_use":
+                tool_calls = [b for b in response.content if b.type == "tool_use"]
+                messages.append({"role": "assistant", "content": response.content})
+
+                tool_results = []
+                for tc in tool_calls:
+                    logger.info(f"Executing tool: {tc.name}")
+                    result = self._execute_tool(tc.name, tc.input)
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": tc.id,
+                        "content": result,
+                    })
+                messages.append({"role": "user", "content": tool_results})
+            else:
+                logger.warning(f"Unexpected stop_reason: {response.stop_reason}")
+                break
+
+        return "Maximum iterations reached. Please refine your query."
+
+    # ──────────────────────────────────────────────
+    # Chat — OpenAI-compatible backend
+    # ──────────────────────────────────────────────
+
+    def _chat_openai_compatible(self, messages: List[Dict], system_prompt: str) -> str:
+        """Agentic loop for OpenAI-compatible local LLM backend."""
+        max_iterations = self.config.get("agent", {}).get("max_iterations", 10)
+        # OpenAI 포맷: system 메시지를 messages 앞에 삽입
+        full_messages = [{"role": "system", "content": system_prompt}] + messages
+
+        for _ in range(max_iterations):
+            response = self.client.chat.completions.create(
+                model=self.model,
+                max_tokens=self.max_tokens,
+                tools=self._tools_formatted,
+                tool_choice="auto",
+                messages=full_messages,
+            )
+
+            choice = response.choices[0]
+            msg = choice.message
+
+            # 도구 호출 없음 → 최종 답변
+            if not msg.tool_calls:
+                return msg.content or ""
+
+            # 도구 호출 존재 → assistant 메시지 추가
+            full_messages.append({
+                "role": "assistant",
+                "content": msg.content,
+                "tool_calls": [
+                    {
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments,
+                        },
+                    }
+                    for tc in msg.tool_calls
+                ],
+            })
+
+            # 각 도구 실행 후 결과를 tool 메시지로 추가
+            for tc in msg.tool_calls:
+                logger.info(f"Executing tool: {tc.function.name}")
+                try:
+                    tool_input = json.loads(tc.function.arguments)
+                except json.JSONDecodeError:
+                    tool_input = {}
+                result = self._execute_tool(tc.function.name, tool_input)
+                full_messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "content": result,
+                })
+
+        return "Maximum iterations reached. Please refine your query."
+
+    # ──────────────────────────────────────────────
+    # Public API
+    # ──────────────────────────────────────────────
 
     def chat(self, user_message: str) -> str:
         """
@@ -161,115 +334,56 @@ class RSAgent:
 
         Pipeline:
         1. Task-Aware Retrieval → expert solution context
-        2. DualRAG knowledge enrichment (if knowledge query detected)
-        3. LLM Central Controller with tool use loop
-        4. Tool execution and result synthesis
+        2. LLM Central Controller with tool-use loop
+        3. Tool execution and result synthesis
         """
         logger.info(f"Processing query: {user_message[:100]}...")
-
-        # Build enriched system prompt via Task-Aware Retrieval
         system_prompt = self._build_system_prompt(user_message)
-
-        # Add user message to conversation history
-        self.conversation_history.append({
-            "role": "user",
-            "content": user_message,
-        })
-
-        # Agent loop: LLM → tool calls → results → LLM
+        self.conversation_history.append({"role": "user", "content": user_message})
         messages = list(self.conversation_history)
-        max_iterations = self.config.get("agent", {}).get("max_iterations", 10)
 
-        for iteration in range(max_iterations):
-            logger.debug(f"Agent iteration {iteration + 1}/{max_iterations}")
+        if self.backend == "anthropic":
+            response_text = self._chat_anthropic(messages, system_prompt)
+        else:
+            response_text = self._chat_openai_compatible(messages, system_prompt)
 
-            # Call the Central Controller (LLM)
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=self.max_tokens,
-                thinking={"type": "adaptive"},
-                system=system_prompt,
-                tools=self.anthropic_tools,
-                messages=messages,
-            )
-
-            # Check stop reason
-            if response.stop_reason == "end_turn":
-                # Extract final text response
-                final_text = ""
-                for block in response.content:
-                    if block.type == "text":
-                        final_text += block.text
-                # Add assistant response to history
-                self.conversation_history.append({
-                    "role": "assistant",
-                    "content": final_text,
-                })
-                return final_text
-
-            elif response.stop_reason == "tool_use":
-                # Extract tool calls
-                tool_calls = [b for b in response.content if b.type == "tool_use"]
-                thinking_blocks = [b for b in response.content if b.type == "thinking"]
-
-                if self.config.get("agent", {}).get("verbose", True):
-                    for tb in thinking_blocks:
-                        logger.debug(f"[Thinking] {tb.thinking[:200]}...")
-
-                # Append assistant message (with tool_use blocks)
-                messages.append({"role": "assistant", "content": response.content})
-
-                # Execute tools and collect results
-                tool_results = []
-                for tool_call in tool_calls:
-                    logger.info(f"Executing tool: {tool_call.name} with {tool_call.input}")
-                    result = self._execute_tool(tool_call.name, tool_call.input)
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": tool_call.id,
-                        "content": result,
-                    })
-
-                # Append tool results as user message
-                messages.append({"role": "user", "content": tool_results})
-
-            else:
-                # Unexpected stop reason
-                logger.warning(f"Unexpected stop_reason: {response.stop_reason}")
-                break
-
-        return "Maximum iterations reached. Please refine your query."
+        self.conversation_history.append({"role": "assistant", "content": response_text})
+        return response_text
 
     def stream_chat(self, user_message: str) -> Generator[str, None, None]:
         """
         Process a user message with streaming output.
 
-        Yields text chunks as they are generated by the Central Controller.
-        Tool execution results are yielded as formatted messages.
+        Anthropic 백엔드에서는 스트리밍을 지원합니다.
+        OpenAI 호환 백엔드에서는 non-streaming으로 fallback합니다.
         """
+        if self.backend == "anthropic":
+            yield from self._stream_chat_anthropic(user_message)
+        else:
+            response = self.chat(user_message)
+            yield response
+
+    def _stream_chat_anthropic(self, user_message: str) -> Generator[str, None, None]:
+        """Anthropic 백엔드 스트리밍 구현."""
         system_prompt = self._build_system_prompt(user_message)
         self.conversation_history.append({"role": "user", "content": user_message})
         messages = list(self.conversation_history)
         max_iterations = self.config.get("agent", {}).get("max_iterations", 10)
         full_response = ""
 
-        for iteration in range(max_iterations):
+        for _ in range(max_iterations):
             with self.client.messages.stream(
                 model=self.model,
                 max_tokens=self.max_tokens,
-                thinking={"type": "adaptive"},
+                thinking=self.thinking_config,
                 system=system_prompt,
-                tools=self.anthropic_tools,
+                tools=self._tools_formatted,
                 messages=messages,
             ) as stream:
-                current_tool_calls = []
-                current_text = ""
-
                 for event in stream:
                     if event.type == "content_block_delta":
                         if event.delta.type == "text_delta":
                             chunk = event.delta.text
-                            current_text += chunk
                             full_response += chunk
                             yield chunk
 
@@ -282,18 +396,18 @@ class RSAgent:
                     })
                     return
 
-                elif final_msg.stop_reason == "tool_use":
+                if final_msg.stop_reason == "tool_use":
                     tool_calls = [b for b in final_msg.content if b.type == "tool_use"]
                     messages.append({"role": "assistant", "content": final_msg.content})
 
                     tool_results = []
-                    for tool_call in tool_calls:
-                        yield f"\n\n[Executing: {tool_call.name}...]\n"
-                        result = self._execute_tool(tool_call.name, tool_call.input)
+                    for tc in tool_calls:
+                        yield f"\n\n[Executing: {tc.name}...]\n"
+                        result = self._execute_tool(tc.name, tc.input)
                         yield f"[Tool Result]\n```json\n{result}\n```\n\n"
                         tool_results.append({
                             "type": "tool_result",
-                            "tool_use_id": tool_call.id,
+                            "tool_use_id": tc.id,
                             "content": result,
                         })
                     messages.append({"role": "user", "content": tool_results})
@@ -301,11 +415,7 @@ class RSAgent:
                     break
 
     def knowledge_query(self, query: str) -> Dict[str, Any]:
-        """
-        Directly query the Knowledge Space using DualRAG.
-
-        Returns the retrieved knowledge without going through the agent loop.
-        """
+        """Directly query the Knowledge Space using DualRAG."""
         return self.dual_rag.query(query)
 
     def reset_conversation(self):
@@ -314,16 +424,14 @@ class RSAgent:
         logger.info("Conversation history cleared.")
 
     def get_available_tools(self) -> List[str]:
-        """Return list of available tool names."""
         return list(self.tool_map.keys())
 
     def get_tool_descriptions(self) -> Dict[str, str]:
-        """Return tool name → description mapping."""
         return {tool.name: tool.description for tool in self.tools}
 
     def __repr__(self) -> str:
         return (
-            f"RSAgent(model={self.model!r}, "
+            f"RSAgent(backend={self.backend!r}, model={self.model!r}, "
             f"tools={len(self.tools)}, "
             f"solutions={len(self.solution_db)}, "
             f"knowledge={len(self.knowledge_db)})"

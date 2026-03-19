@@ -1,23 +1,57 @@
 # RS-Agent Configuration
 
+# ──────────────────────────────────────────────
 # Central Controller LLM
+# ──────────────────────────────────────────────
 llm:
-  model: "claude-opus-4-6"
+  # backend 옵션:
+  #   "anthropic"         - Anthropic Claude API (외부망 필요)
+  #   "openai_compatible" - OpenAI 호환 로컬 서버 (vLLM, LM Studio, Ollama /v1 등)
+  #   "ollama"            - Ollama 네이티브 API
+  backend: "openai_compatible"
+
+  # 사용할 모델 이름 (백엔드에 따라 다름)
+  # Anthropic  예: "claude-opus-4-6"
+  # Ollama     예: "llama3.1:70b", "qwen2.5:72b", "mistral:7b"
+  # vLLM       예: "Qwen/Qwen2.5-72B-Instruct"
+  model: "llama3.1:70b"
+
   max_tokens: 4096
+
+  # openai_compatible / ollama 백엔드 설정
+  base_url: "http://localhost:11434/v1"  # Ollama OpenAI 호환 엔드포인트
+  api_key: "ollama"                       # 로컬 서버는 임의 값 사용
+
+  # Anthropic 전용 설정 (backend: "anthropic" 일 때만 사용됨)
   thinking:
     type: "adaptive"
 
+# ──────────────────────────────────────────────
 # Solution Space (Task-Aware Retrieval)
+# ──────────────────────────────────────────────
 solution_space:
   data_dir: "data/solutions"
+
+  # 임베딩 모델 설정
+  # 온라인: HuggingFace 모델 이름 (예: "all-MiniLM-L6-v2")
+  # 오프라인: 로컬 모델 경로 (예: "/models/all-MiniLM-L6-v2")
   embedding_model: "all-MiniLM-L6-v2"
+  local_model_path: ""   # 비워두면 HuggingFace에서 다운로드
+                          # 폐쇄망: "/path/to/local/all-MiniLM-L6-v2" 로 설정
+
   top_k: 3
   similarity_threshold: 0.5
 
+# ──────────────────────────────────────────────
 # Knowledge Space (DualRAG)
+# ──────────────────────────────────────────────
 knowledge_space:
   data_dir: "data/knowledge"
+
+  # 임베딩 모델 설정 (solution_space와 동일한 방식)
   embedding_model: "all-MiniLM-L6-v2"
+  local_model_path: ""   # 폐쇄망: "/path/to/local/all-MiniLM-L6-v2" 로 설정
+
   top_k_semantic: 5
   top_k_keyword: 5
   semantic_weight: 0.6

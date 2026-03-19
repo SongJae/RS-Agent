@@ -31,6 +31,7 @@ class TaskAwareRetrieval:
         self,
         solution_db,
         embedding_model: str = "all-MiniLM-L6-v2",
+        local_model_path: str = "",
         top_k: int = 3,
         similarity_threshold: float = 0.3,
     ):
@@ -39,7 +40,9 @@ class TaskAwareRetrieval:
         self.similarity_threshold = similarity_threshold
         self.embeddings: Optional[np.ndarray] = None
         self.model = None
-        self._init_embeddings(embedding_model)
+        # 폐쇄망: local_model_path가 지정되면 해당 경로에서 로드, 아니면 HuggingFace 다운로드
+        model_to_load = local_model_path.strip() if local_model_path else embedding_model
+        self._init_embeddings(model_to_load)
 
     def _init_embeddings(self, model_name: str):
         """Initialize the sentence transformer and pre-compute solution embeddings."""
