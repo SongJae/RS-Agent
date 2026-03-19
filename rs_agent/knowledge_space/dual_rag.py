@@ -191,8 +191,20 @@ class DualRAG:
 
         # Build semantic index
         try:
+            import os
             from sentence_transformers import SentenceTransformer
-            self.semantic_model = SentenceTransformer(model_name)
+
+            # 폐쇄망: local path가 지정된 경우 HuggingFace Hub 네트워크 접근을 완전 차단
+            is_local_path = os.path.isdir(model_name)
+            if is_local_path:
+                os.environ.setdefault("HF_HUB_OFFLINE", "1")
+                os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+                self.semantic_model = SentenceTransformer(
+                    model_name, local_files_only=True
+                )
+            else:
+                self.semantic_model = SentenceTransformer(model_name)
+
             self.doc_embeddings = self.semantic_model.encode(
                 doc_texts, normalize_embeddings=True
             )

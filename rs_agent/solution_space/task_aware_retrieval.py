@@ -47,8 +47,18 @@ class TaskAwareRetrieval:
     def _init_embeddings(self, model_name: str):
         """Initialize the sentence transformer and pre-compute solution embeddings."""
         try:
+            import os
             from sentence_transformers import SentenceTransformer
-            self.model = SentenceTransformer(model_name)
+
+            # 폐쇄망: local path가 지정된 경우 HuggingFace Hub 네트워크 접근을 완전 차단
+            is_local_path = os.path.isdir(model_name)
+            if is_local_path:
+                os.environ.setdefault("HF_HUB_OFFLINE", "1")
+                os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+                self.model = SentenceTransformer(model_name, local_files_only=True)
+            else:
+                self.model = SentenceTransformer(model_name)
+
             self._build_index()
             logger.info(f"Task-Aware Retrieval initialized with {len(self.solution_db)} solutions")
         except ImportError:
