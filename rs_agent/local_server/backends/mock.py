@@ -88,12 +88,6 @@ _TOOL_RULES: List[Dict] = [
         "summary": "토지이용 분류가 완료되었습니다. LULC 지도가 생성되었습니다.",
     },
     {
-        "keywords": ["change", "변화", "차이", "before", "after"],
-        "tool": "change_detection",
-        "args_template": {"image_path_before": "{image_path}", "image_path_after": "after.jpg"},
-        "summary": "변화 탐지가 완료되었습니다. 두 시기 영상 간의 토지 피복 변화가 감지되었습니다.",
-    },
-    {
         "keywords": ["damage", "disaster", "피해", "재해", "재난"],
         "tool": "damage_assessment",
         "args_template": {"image_path": "{image_path}", "disaster_type": "flood"},
@@ -163,7 +157,7 @@ _TOOL_RULES: List[Dict] = [
     {
         "keywords": ["change", "변화", "차이"],
         "tool": "change_detection",
-        "args_template": {"image_path_before": "{image_path}", "image_path_after": "after.jpg"},
+        "args_template": {"image_t1": "{image_path}", "image_t2": "{image_path_after}"},
         "summary": "변화 탐지가 완료되었습니다. 두 시기 영상 간의 토지 피복 변화가 감지되었습니다.",
     },
     {
@@ -228,10 +222,19 @@ def _fill_args(template: Dict, image_path: str, messages: List[Dict]) -> Dict:
         msg.get("content", "") for msg in messages
         if isinstance(msg.get("content"), str)
     )
+    # user 메시지에서만 이미지 경로 추출 (변화 탐지 before/after 지원)
+    user_text = " ".join(
+        msg.get("content", "") for msg in messages
+        if msg.get("role") == "user" and isinstance(msg.get("content"), str)
+    )
+    all_images = re.findall(r'[\w./\-]+\.(?:jpg|jpeg|png|tif|tiff)', user_text, re.IGNORECASE)
+    image_after = all_images[1] if len(all_images) >= 2 else image_path
+
     filled = {}
     for k, v in template.items():
         if isinstance(v, str):
             v = v.replace("{image_path}", image_path)
+            v = v.replace("{image_path_after}", image_after)
             v = v.replace("{query}", full_text[:200])
             v = v.replace("{question}", full_text[:200])
         filled[k] = v

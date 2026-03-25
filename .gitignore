@@ -26,3 +26,12 @@ build/
 
 # Data outputs
 *.log
+
+# 대용량 위성 이미지 (GitHub 100MB 제한)
+data/images/landsat9.tif
+data/images/rgb_satellite.tif
+data/images/geotiff_test/
+data/images/geotiff_test.zip
+data/images/small.tif
+data/images/float32.tif
+data/images/alpha.tif
