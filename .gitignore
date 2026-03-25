@@ -21,8 +21,10 @@ build/
 # Jupyter
 .ipynb_checkpoints/
 
-# Models (로컬 LLM / 임베딩 모델 — 용량이 크므로 제외)
-/models/
+# Models (대형 LLM 모델 — 100MB 초과 파일 제외)
+# 임베딩 모델(all-MiniLM-L6-v2, 87MB)은 포함됨
+models/*/pytorch_model-*.bin
+models/*/model-*.safetensors
 
 # Data outputs
 *.log
