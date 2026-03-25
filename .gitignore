@@ -26,8 +26,19 @@ build/
 models/*/pytorch_model-*.bin
 models/*/model-*.safetensors
 
+# Miniconda 설치 원본 (155MB — 분할 파일인 *.partaa/ab 로 대체)
+install/Miniconda3-latest-Linux-x86_64.sh
+
 # Data outputs
 *.log
+
+# conda 환경 패키지 (3GB — USB로 별도 복사)
+rs-agent-env.tar.gz
+
+# 런타임 생성 실행 스크립트 (install_offline.sh가 자동 생성)
+run_server.sh
+run_server_gpu.sh
+run_ui.sh
 
 # 대용량 위성 이미지 (GitHub 100MB 제한)
 data/images/landsat9.tif
