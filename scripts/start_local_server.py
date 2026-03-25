@@ -4,18 +4,24 @@ RS-Agent 로컬 LLM 서버 실행 스크립트
 
 폐쇄망 환경에서 Ollama/vLLM 대신 사용하는 OpenAI 호환 로컬 서버입니다.
 
-사용 예:
-  # Mock 모드 (모델 없이 파이프라인 검증)
+[Mock 모드] 모델 없이 파이프라인 검증 (GPU 불필요):
   python scripts/start_local_server.py --backend mock
 
-  # Transformers 모드 (로컬 모델 사용)
+[A100 0.3장, 24GB] Qwen2.5-7B FP16:
   python scripts/start_local_server.py --backend transformers \\
     --model-path /models/Qwen2.5-7B-Instruct
 
-  # CPU 전용 + 8비트 양자화
+[A100 0.3장, 12GB] Qwen2.5-7B 4-bit 양자화:
   python scripts/start_local_server.py --backend transformers \\
-    --model-path /models/Llama-3.1-8B-Instruct \\
-    --device cpu --load-in-8bit
+    --model-path /models/Qwen2.5-7B-Instruct --load-in-4bit
+
+[GPU 메모리 절약, 8-bit]:
+  python scripts/start_local_server.py --backend transformers \\
+    --model-path /models/Llama-3.1-8B-Instruct --load-in-8bit
+
+[CPU 전용]:
+  python scripts/start_local_server.py --backend transformers \\
+    --model-path /models/Phi-3-mini --device cpu
 """
 
 import argparse
@@ -42,18 +48,23 @@ def parse_args():
         "--model-path",
         type=str,
         default="",
-        help="[transformers 백엔드] 로컬 모델 디렉토리 경로",
+        help="[transformers] 로컬 모델 디렉토리 경로",
     )
     parser.add_argument(
         "--device",
         type=str,
         default="auto",
-        help="[transformers 백엔드] 연산 디바이스 (auto/cpu/cuda, default: auto)",
+        help="[transformers] 디바이스 (auto/cpu/cuda, default: auto)",
     )
     parser.add_argument(
         "--load-in-8bit",
         action="store_true",
-        help="[transformers 백엔드] 8비트 양자화 사용 (GPU 메모리 절약)",
+        help="[transformers] 8-bit 양자화 (~절반 VRAM)",
+    )
+    parser.add_argument(
+        "--load-in-4bit",
+        action="store_true",
+        help="[transformers] 4-bit 양자화 NF4 (~1/4 VRAM, A100 12GB 이하 권장)",
     )
     parser.add_argument(
         "--host",
@@ -85,6 +96,10 @@ def main():
     )
     logger = logging.getLogger("rs_agent.server")
 
+    if args.load_in_4bit and args.load_in_8bit:
+        logger.error("--load-in-4bit과 --load-in-8bit은 동시에 사용할 수 없습니다.")
+        sys.exit(1)
+
     try:
         import uvicorn
         from rs_agent.local_server.server import create_app
@@ -97,6 +112,7 @@ def main():
         "model_path": args.model_path,
         "device": args.device,
         "load_in_8bit": args.load_in_8bit,
+        "load_in_4bit": args.load_in_4bit,
     }
 
     logger.info(f"백엔드: {args.backend}")
@@ -105,6 +121,12 @@ def main():
             logger.error("--model-path 옵션이 필요합니다.")
             sys.exit(1)
         logger.info(f"모델 경로: {args.model_path}")
+        if args.load_in_4bit:
+            logger.info("양자화: 4-bit NF4 (최대 메모리 절약)")
+        elif args.load_in_8bit:
+            logger.info("양자화: 8-bit")
+        else:
+            logger.info("양자화: 없음 (FP16)")
 
     app = create_app(backend_name=args.backend, **backend_kwargs)
 

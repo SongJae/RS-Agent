@@ -85,6 +85,7 @@ def create_app(backend_name: str = "mock", **backend_kwargs) -> FastAPI:
             model_path=model_path,
             device=backend_kwargs.get("device", "auto"),
             load_in_8bit=backend_kwargs.get("load_in_8bit", False),
+            load_in_4bit=backend_kwargs.get("load_in_4bit", False),
         )
         model_id = model_path
     else:
