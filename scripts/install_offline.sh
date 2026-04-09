@@ -58,30 +58,33 @@ echo "[1/4] venv 환경 압축 해제 중 (시간 소요)..."
 tar -xzf "$ENV_TAR" -C "$HOME"
 echo "  → 압축 해제 완료: $INSTALL_DIR"
 
-# ── 3. venv 경로 재설정 ──────────────────────────────────────────────────────
+# ── 3. 경로 재설정 (포맷 자동 감지) ─────────────────────────────────────────
 echo ""
-echo "[2/4] venv 경로 재설정 중..."
+echo "[2/4] 환경 경로 재설정 중..."
 
-# pack_conda_env.sh 가 저장한 원본 패킹 경로
-ORIGINAL_PATH=$(cat "$INSTALL_DIR/.rs_original_path" 2>/dev/null || echo "")
-
-if [ -n "$ORIGINAL_PATH" ] && [ "$ORIGINAL_PATH" != "$INSTALL_DIR" ]; then
-  echo "  원본: $ORIGINAL_PATH"
-  echo "  현재: $INSTALL_DIR"
-
-  # bin/ 스크립트의 shebang 및 경로 참조 수정
-  find "$INSTALL_DIR/bin" -maxdepth 1 -type f | while IFS= read -r f; do
-    head -c 2 "$f" 2>/dev/null | grep -q $'#!' || continue
-    sed -i "s|${ORIGINAL_PATH}|${INSTALL_DIR}|g" "$f" 2>/dev/null || true
-  done
-  # activate 스크립트 경로 수정
-  for act in activate activate.csh activate.fish; do
-    [ -f "$INSTALL_DIR/bin/$act" ] && \
-      sed -i "s|${ORIGINAL_PATH}|${INSTALL_DIR}|g" "$INSTALL_DIR/bin/$act" 2>/dev/null || true
-  done
-  echo "  → 경로 재설정 완료"
+if [ -f "$INSTALL_DIR/bin/conda-unpack" ]; then
+  # ── conda-pack 포맷: conda-unpack 이 경로를 자동으로 재설정 ──────────────
+  echo "  conda-pack 포맷 감지 → conda-unpack 실행 중..."
+  "$INSTALL_DIR/bin/conda-unpack"
+  echo "  → 완료"
 else
-  echo "  → 경로 동일 — 재설정 불필요"
+  # ── venv + tar 포맷: sed 로 경로 수동 치환 ───────────────────────────────
+  ORIGINAL_PATH=$(cat "$INSTALL_DIR/.rs_original_path" 2>/dev/null || echo "")
+  if [ -n "$ORIGINAL_PATH" ] && [ "$ORIGINAL_PATH" != "$INSTALL_DIR" ]; then
+    echo "  venv 포맷 감지"
+    echo "  원본: $ORIGINAL_PATH → 현재: $INSTALL_DIR"
+    find "$INSTALL_DIR/bin" -maxdepth 1 -type f | while IFS= read -r f; do
+      head -c 2 "$f" 2>/dev/null | grep -q $'#!' || continue
+      sed -i "s|${ORIGINAL_PATH}|${INSTALL_DIR}|g" "$f" 2>/dev/null || true
+    done
+    for act in activate activate.csh activate.fish; do
+      [ -f "$INSTALL_DIR/bin/$act" ] && \
+        sed -i "s|${ORIGINAL_PATH}|${INSTALL_DIR}|g" "$INSTALL_DIR/bin/$act" 2>/dev/null || true
+    done
+    echo "  → 경로 재설정 완료"
+  else
+    echo "  → 경로 동일 — 재설정 불필요"
+  fi
 fi
 
 # ── 4. 코어 패키지 보완 (wheels에서 설치) ────────────────────────────────────
