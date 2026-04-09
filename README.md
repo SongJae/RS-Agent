@@ -157,23 +157,38 @@ bash RS-Agent/scripts/install_offline.sh ~/rs-agent-env.tar.gz
 
 ---
 
-#### 방법 2: USB/HDD 복사
+#### 방법 2: USB — wheel 파일 직접 복사 (rs-agent-env.tar.gz 불필요)
 
-**① 인터넷 PC에서 환경 패킹** (방법 1의 ①②와 동일)
+**① 인터넷 PC에서 — ML wheels 복사**
+
+```bash
+# 이 서버에 이미 있다면 바로 USB로 복사
+cp -r RS-Agent/packages/ml-wheels/ /media/usb/ml-wheels/
+
+# 없으면 먼저 다운로드
+bash RS-Agent/scripts/download_ml.sh
+cp -r RS-Agent/packages/ml-wheels/ /media/usb/ml-wheels/
+```
 
 **② USB 구조**
 
 ```
 /usb/
-├── rs-agent-env.tar.gz      ← pack_conda_env.sh 생성물 (~3 GB)
-└── RS-Agent/                ← 저장소 전체 (코드 + 모델 + wheels 포함)
+├── RS-Agent/               ← 저장소 (git clone 또는 zip, ~300 MB)
+│   └── packages/wheels/    ← 코어 패키지 (git에 포함됨)
+└── ml-wheels/              ← ML 패키지 whl 파일 (~2.8 GB, 86개 파일)
+    ├── torch-*.whl
+    ├── transformers-*.whl
+    └── ...
 ```
 
-**③ 폐쇄망 PC에서 설치**
+**③ 폐쇄망 PC에서 설치 (한 번에 완료)**
 
 ```bash
-bash RS-Agent/scripts/install_offline.sh /media/usb/rs-agent-env.tar.gz
+bash RS-Agent/scripts/setup_offline.sh /media/usb/ml-wheels
 ```
+
+`rs-agent-env.tar.gz` 생성/전송 단계 없이 wheel → venv 직접 설치합니다.
 
 ---
 
