@@ -102,49 +102,85 @@ pip install -r requirements.txt
 
 ### B. 폐쇄망 환경 — 단계별 가이드
 
-#### 1단계: 인터넷 PC에서 환경 패킹
+> **ML 패키지(~2.8 GB)는 git에 포함되지 않습니다.**
+> SFTP 또는 USB로 전송해야 합니다. 아래 두 가지 방법 중 하나를 선택하세요.
 
-저장소를 클론한 뒤 스크립트를 실행합니다.
-Miniconda 설치 파일(`install/Miniconda3-latest-Linux-x86_64.sh`)을 자동으로 사용합니다.
+---
+
+#### 방법 1: SFTP 전송 (권장 — USB 없이 네트워크로 전송)
+
+```
+[인터넷 PC]                              [폐쇄망 PC]
+   ①  git clone + download_ml.sh
+   ②  pack_conda_env.sh → rs-agent-env.tar.gz
+   ③  sftp 전송 ──────────────────────────────► ④  install_offline.sh
+```
+
+**① 인터넷 PC — ML 패키지 다운로드**
 
 ```bash
 git clone <repo-url>
 cd RS-Agent
 
-# GPU 환경 (CUDA)
+# ML wheels 다운로드 → packages-ml.tar.gz 생성 (~2.8 GB)
+bash scripts/download_ml.sh
+```
+
+**② 인터넷 PC — 환경 패킹**
+
+```bash
+# GPU 환경 (CUDA) — packages-ml.tar.gz 가 있으면 자동 인식
 bash scripts/pack_conda_env.sh
+# → rs-agent-env.tar.gz (~3 GB) 생성
 
 # Flash Attention 빌드 시간을 줄이려면
 bash scripts/pack_conda_env.sh --no-flash-attn
 ```
 
-생성 결과:
+**③ SFTP로 폐쇄망 PC에 전송**
 
-```
-rs-agent-env.tar.gz   ← conda 환경 전체 (~3 GB)
+```bash
+# 인터넷 PC에서 실행 (사용자 계정/IP는 실제 환경에 맞게 변경)
+sftp user@<폐쇄망-IP>
+sftp> put rs-agent-env.tar.gz
+sftp> exit
 ```
 
-#### 2단계: USB/HDD 복사
+**④ 폐쇄망 PC — 설치**
+
+```bash
+# git repo는 별도로 git clone 또는 zip 복사
+git clone <repo-url>   # 또는 zip 압축 해제
+
+bash RS-Agent/scripts/install_offline.sh ~/rs-agent-env.tar.gz
+```
+
+---
+
+#### 방법 2: USB/HDD 복사
+
+**① 인터넷 PC에서 환경 패킹** (방법 1의 ①②와 동일)
+
+**② USB 구조**
 
 ```
 /usb/
-├── rs-agent-env.tar.gz      ← pack_conda_env.sh 생성물 (3 GB)
-└── RS-Agent/                ← 저장소 전체 (코드 + 모델 + wheels + Miniconda 포함)
+├── rs-agent-env.tar.gz      ← pack_conda_env.sh 생성물 (~3 GB)
+└── RS-Agent/                ← 저장소 전체 (코드 + 모델 + wheels 포함)
 ```
 
-**저장소 자체에 이미 포함된 항목 (별도 준비 불필요):**
-- `install/Miniconda3-latest-Linux-x86_64.sh` — Miniconda 설치 파일
-- `packages/wheels/` — 코어 pip 패키지 wheel 파일 47개
-- `models/all-MiniLM-L6-v2/` — 임베딩 모델
-
-#### 3단계: 폐쇄망 PC에서 설치
+**③ 폐쇄망 PC에서 설치**
 
 ```bash
-bash RS-Agent/scripts/install_offline.sh
-
-# tar.gz 경로를 직접 지정하는 경우
 bash RS-Agent/scripts/install_offline.sh /media/usb/rs-agent-env.tar.gz
 ```
+
+---
+
+**저장소 자체에 이미 포함된 항목 (별도 준비 불필요):**
+- `install/Miniconda3-latest-Linux-x86_64.sh.partaa/ab` — Miniconda 설치 분할파일
+- `packages/wheels/` — 코어 pip 패키지 wheel 파일 (~47개)
+- `models/all-MiniLM-L6-v2/` — 임베딩 모델
 
 설치 완료 후 자동 생성되는 실행 스크립트:
 
@@ -215,7 +251,7 @@ print(knowledge["answer"])
 | Miniconda 설치 파일 | `install/Miniconda3-*.sh` | ✅ | 155 MB |
 | 코어 pip wheels | `packages/wheels/` | ✅ | 104 MB, 파일별 <50 MB |
 | 임베딩 모델 | `models/all-MiniLM-L6-v2/` | ✅ | 87 MB |
-| conda 환경 전체 | `rs-agent-env.tar.gz` | ❌ | 3 GB, USB로 별도 복사 |
+| venv 환경 전체 | `rs-agent-env.tar.gz` | ❌ | ~3 GB, SFTP 또는 USB로 전송 |
 | 지식/솔루션 데이터 | `data/knowledge/`, `data/solutions/` | ✅ | JSON 파일 |
 | 예시 이미지 | `data/images/` | ✅ | 위성 사진 |
 | LLM 모델 (선택) | `models/<모델명>/` | ❌ | Mock 모드는 불필요 |

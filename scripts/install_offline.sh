@@ -5,19 +5,17 @@
 # rs-agent-env.tar.gz를 압축 해제하고 RS-Agent를 바로 실행할 수 있게 설정합니다.
 # 인터넷 연결이 전혀 없어도 됩니다.
 #
-# USB/HDD 구조:
-#   /usb/
-#   ├── rs-agent-env.tar.gz      ← conda 환경 전체 (~3 GB)
-#   └── RS-Agent/                ← 저장소 (코드 + 모델 + wheels + Miniconda 포함)
-#       ├── install/
-#       │   └── Miniconda3-latest-Linux-x86_64.sh
+# 전송 구조 (SFTP 또는 USB):
+#   ~/
+#   ├── rs-agent-env.tar.gz      ← venv 환경 전체 (~3 GB)
+#   └── RS-Agent/                ← 저장소 (코드 + 모델 + wheels 포함)
 #       ├── packages/wheels/     ← 코어 pip 패키지
 #       ├── models/all-MiniLM-L6-v2/
 #       └── scripts/install_offline.sh  ← 이 파일
 #
 # 사용법:
 #   bash RS-Agent/scripts/install_offline.sh
-#   bash RS-Agent/scripts/install_offline.sh /media/usb/rs-agent-env.tar.gz
+#   bash RS-Agent/scripts/install_offline.sh /경로/rs-agent-env.tar.gz
 # =============================================================================
 set -euo pipefail
 
@@ -29,59 +27,66 @@ if [ $# -ge 1 ]; then
   ENV_TAR="$1"
 else
   ENV_TAR="$(dirname "$PROJECT_DIR")/rs-agent-env.tar.gz"
-  # RS-Agent/ 자체에도 있으면 그쪽 사용
   [ -f "$PROJECT_DIR/rs-agent-env.tar.gz" ] && ENV_TAR="$PROJECT_DIR/rs-agent-env.tar.gz"
 fi
 
 INSTALL_DIR="$HOME/rs-agent-env"
-MINICONDA_SH="$PROJECT_DIR/install/Miniconda3-latest-Linux-x86_64.sh"
 
 echo "======================================================"
 echo " RS-Agent 오프라인 설치"
-echo " conda 환경 : $ENV_TAR"
+echo " venv 환경  : $ENV_TAR"
 echo " 설치 경로  : $INSTALL_DIR"
 echo " 프로젝트   : $PROJECT_DIR"
 echo "======================================================"
 
-# ── 0. Miniconda 분할 파일 복원 (필요 시) ────────────────────────────────────
-PART_AA="$PROJECT_DIR/install/Miniconda3-latest-Linux-x86_64.sh.partaa"
-if [ ! -f "$MINICONDA_SH" ] && [ -f "$PART_AA" ]; then
-  echo ""
-  echo "[0/4] Miniconda 분할 파일 복원 중..."
-  cat "$PROJECT_DIR/install/Miniconda3-latest-Linux-x86_64.sh.part"* > "$MINICONDA_SH"
-  chmod +x "$MINICONDA_SH"
-  echo "  → 복원 완료"
-fi
-echo "======================================================"
-
 # ── 1. tar.gz 확인 ───────────────────────────────────────────────────────────
 if [ ! -f "$ENV_TAR" ]; then
-  echo "[ERROR] conda 환경 파일을 찾을 수 없습니다: $ENV_TAR"
+  echo "[ERROR] venv 환경 파일을 찾을 수 없습니다: $ENV_TAR"
   echo ""
   echo "  확인 사항:"
-  echo "    1) rs-agent-env.tar.gz를 RS-Agent/ 또는 상위 디렉토리에 복사"
+  echo "    1) rs-agent-env.tar.gz를 홈 디렉토리(~/) 또는 RS-Agent/ 에 복사"
   echo "    2) bash install_offline.sh /경로/rs-agent-env.tar.gz"
   exit 1
 fi
 
-# ── 2. conda 환경 압축 해제 ──────────────────────────────────────────────────
+# ── 2. venv 환경 압축 해제 ───────────────────────────────────────────────────
 echo ""
-echo "[1/4] conda 환경 압축 해제 중 (시간 소요)..."
+echo "[1/4] venv 환경 압축 해제 중 (시간 소요)..."
 [ -d "$INSTALL_DIR" ] && rm -rf "$INSTALL_DIR"
-mkdir -p "$INSTALL_DIR"
-tar -xzf "$ENV_TAR" -C "$INSTALL_DIR"
-echo "  → 압축 해제 완료"
+# pack_conda_env.sh 는 $HOME 기준으로 rs-agent-env/ 를 아카이빙
+# → $HOME 에 직접 풀어야 $HOME/rs-agent-env/ 가 생성됨
+tar -xzf "$ENV_TAR" -C "$HOME"
+echo "  → 압축 해제 완료: $INSTALL_DIR"
 
-# ── 3. 환경 경로 재설정 (conda-unpack) ───────────────────────────────────────
+# ── 3. venv 경로 재설정 ──────────────────────────────────────────────────────
 echo ""
-echo "[2/4] 환경 경로 재설정 중..."
-source "$INSTALL_DIR/bin/activate"
-conda-unpack
-echo "  → 재설정 완료"
+echo "[2/4] venv 경로 재설정 중..."
+
+# pack_conda_env.sh 가 저장한 원본 패킹 경로
+ORIGINAL_PATH=$(cat "$INSTALL_DIR/.rs_original_path" 2>/dev/null || echo "")
+
+if [ -n "$ORIGINAL_PATH" ] && [ "$ORIGINAL_PATH" != "$INSTALL_DIR" ]; then
+  echo "  원본: $ORIGINAL_PATH"
+  echo "  현재: $INSTALL_DIR"
+
+  # bin/ 스크립트의 shebang 및 경로 참조 수정
+  find "$INSTALL_DIR/bin" -maxdepth 1 -type f | while IFS= read -r f; do
+    head -c 2 "$f" 2>/dev/null | grep -q $'#!' || continue
+    sed -i "s|${ORIGINAL_PATH}|${INSTALL_DIR}|g" "$f" 2>/dev/null || true
+  done
+  # activate 스크립트 경로 수정
+  for act in activate activate.csh activate.fish; do
+    [ -f "$INSTALL_DIR/bin/$act" ] && \
+      sed -i "s|${ORIGINAL_PATH}|${INSTALL_DIR}|g" "$INSTALL_DIR/bin/$act" 2>/dev/null || true
+  done
+  echo "  → 경로 재설정 완료"
+else
+  echo "  → 경로 동일 — 재설정 불필요"
+fi
 
 # ── 4. 코어 패키지 보완 (wheels에서 설치) ────────────────────────────────────
 WHEELS_DIR="$PROJECT_DIR/packages/wheels"
-if [ -d "$WHEELS_DIR" ] && [ "$(ls -A "$WHEELS_DIR")" ]; then
+if [ -d "$WHEELS_DIR" ] && [ "$(ls -A "$WHEELS_DIR" 2>/dev/null)" ]; then
   echo ""
   echo "[3/4] 코어 패키지 보완 설치 (로컬 wheels)..."
   "$INSTALL_DIR/bin/pip" install \
@@ -102,7 +107,7 @@ cat > "$PROJECT_DIR/run_server.sh" <<RUNEOF
 # LLM 서버 — Mock 모드 (GPU 불필요)
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
-source "$INSTALL_DIR/bin/activate"
+export PATH="$INSTALL_DIR/bin:\$PATH"
 cd "$PROJECT_DIR"
 python scripts/start_local_server.py --backend mock --port 11434
 RUNEOF
@@ -113,7 +118,7 @@ cat > "$PROJECT_DIR/run_server_gpu.sh" <<RUNEOF
 # 사용법: bash run_server_gpu.sh /models/Qwen2.5-7B-Instruct [--load-in-4bit]
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
-source "$INSTALL_DIR/bin/activate"
+export PATH="$INSTALL_DIR/bin:\$PATH"
 cd "$PROJECT_DIR"
 python scripts/start_local_server.py --backend transformers \
   --model-path "\${1:?모델 경로가 필요합니다}" \${2:-} --port 11434
@@ -124,7 +129,7 @@ cat > "$PROJECT_DIR/run_ui.sh" <<RUNEOF
 # Gradio Web UI
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
-source "$INSTALL_DIR/bin/activate"
+export PATH="$INSTALL_DIR/bin:\$PATH"
 cd "$PROJECT_DIR"
 python app.py --port 7860
 RUNEOF
@@ -142,13 +147,13 @@ echo ""
 echo "======================================================"
 echo " 설치 완료!"
 echo ""
-echo " [터미널 1] LLM 서버 시작"
+echo " [터미널 1] LLM 서버 시작 (Mock 모드)"
 echo "   bash $PROJECT_DIR/run_server.sh"
 echo ""
-echo " [터미널 1] A100 GPU 서버 (FP16)"
+echo " [터미널 1] A100 GPU 서버 (FP16, ~24 GB VRAM)"
 echo "   bash $PROJECT_DIR/run_server_gpu.sh models/Qwen2.5-7B-Instruct"
 echo ""
-echo " [터미널 1] A100 GPU 서버 (4-bit, ~12GB VRAM)"
+echo " [터미널 1] A100 GPU 서버 (4-bit, ~12 GB VRAM)"
 echo "   bash $PROJECT_DIR/run_server_gpu.sh models/Qwen2.5-7B-Instruct --load-in-4bit"
 echo ""
 echo " [터미널 2] Web UI 시작"
