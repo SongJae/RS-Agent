@@ -35,6 +35,11 @@ install/Miniconda3-latest-Linux-x86_64.sh
 # conda 환경 패키지 (3GB — USB로 별도 복사)
 rs-agent-env.tar.gz
 
+# ML 패키지 wheels (2.8GB — USB로 별도 복사)
+# packages-ml.tar.gz 로 압축해서 RS-Agent/ 와 함께 USB에 넣으세요
+packages/ml-wheels/
+packages-ml.tar.gz
+
 # 런타임 생성 실행 스크립트 (install_offline.sh가 자동 생성)
 run_server.sh
 run_server_gpu.sh
